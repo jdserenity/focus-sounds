@@ -30,13 +30,6 @@ struct MenuBarView: View {
             Text(sound.title).tag(sound.id)
           }
         }
-
-        if model.canDeleteSelectedSound {
-          Button("Delete sound", role: .destructive) {
-            model.deleteSelectedSound()
-          }
-          .font(.caption)
-        }
       }
 
       HStack {
@@ -78,11 +71,13 @@ struct MenuBarView: View {
         VStack(alignment: .leading, spacing: 4) {
           Text("External audio")
             .font(.caption)
+            .foregroundStyle(model.isDucked ? .orange : .primary)
           ProgressView(value: Double(min(model.externalLevel * 8, 1)))
             .progressViewStyle(.linear)
+            .tint(model.isDucked ? .orange : .accentColor)
           Text(String(format: "%.4f", model.externalLevel))
             .font(.caption2)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(model.isDucked ? .orange : .secondary)
             .monospacedDigit()
         }
       }
@@ -95,7 +90,15 @@ struct MenuBarView: View {
 
       Divider()
 
-      Button("Quit") { NSApplication.shared.terminate(nil) }
+      HStack {
+        Button("Quit") { NSApplication.shared.terminate(nil) }
+        Spacer()
+        if model.canDeleteSelectedSound {
+          Button("Delete sound", role: .destructive) {
+            model.deleteSelectedSound()
+          }
+        }
+      }
     }
     .padding()
     .frame(width: 300)
