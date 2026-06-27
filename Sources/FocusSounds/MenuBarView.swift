@@ -1,4 +1,3 @@
-import AppKit
 import FocusSoundsCore
 import SwiftUI
 import UniformTypeIdentifiers
@@ -6,7 +5,16 @@ import UniformTypeIdentifiers
 @available(macOS 14.2, *)
 struct MenuBarView: View {
   @Bindable var model: AppModel
-  @State private var hostWindow: NSWindow?
+  @State private var showFileImporter = false
+  @State private var isDropTargeted = false
+
+  private static let importTypes: [UTType] = {
+    var types: [UTType] = [.audio, .movie, .mpeg4Movie, .mpeg4Audio, .mp3, .aiff, .wav]
+    for ext in SoundImport.supportedExtensions {
+      if let type = UTType(filenameExtension: ext), !types.contains(type) { types.append(type) }
+    }
+    return types
+  }()
 
   var body: some View {
     ZStack {
@@ -19,10 +27,22 @@ struct MenuBarView: View {
           .transition(.opacity.combined(with: .scale(scale: 0.98)))
       }
     }
-    .background(WindowAccessor { hostWindow = $0 })
     .animation(.easeInOut(duration: 0.2), value: model.isImporting)
     .padding()
     .frame(width: 300)
+    .fileImporter(
+      isPresented: $showFileImporter,
+      allowedContentTypes: Self.importTypes,
+      allowsMultipleSelection: false
+    ) { result in
+      switch result {
+      case .success(let urls):
+        guard let url = urls.first else { return }
+        Task { await model.importSound(from: url) }
+      case .failure(let error):
+        AppAlert.show(title: "Import failed", message: error.localizedDescription)
+      }
+    }
   }
 
   private var mainContent: some View {
@@ -34,9 +54,7 @@ struct MenuBarView: View {
         Text("No sounds yet.")
           .font(.caption)
           .foregroundStyle(.secondary)
-        Text("Import converts to audio-only M4A and trims to 10 minutes.")
-          .font(.caption)
-          .foregroundStyle(.secondary)
+        importHint
       } else {
         Picker("Sound", selection: Binding(
           get: { model.selectedSound?.id ?? "" },
@@ -52,6 +70,8 @@ struct MenuBarView: View {
         }
       }
 
+      dropZone
+
       HStack {
         Button(model.isPlaying ? "Pause" : "Play") {
           model.togglePlayPause()
@@ -59,7 +79,7 @@ struct MenuBarView: View {
         .keyboardShortcut(.return, modifiers: [])
         .disabled(model.sounds.isEmpty || model.isImporting)
 
-        Button("Import…") { presentImportPanel() }
+        Button("Import…") { showFileImporter = true }
           .disabled(model.isImporting)
 
         if model.isPlaying, model.isDucked {
@@ -113,28 +133,32 @@ struct MenuBarView: View {
     }
   }
 
-  private func presentImportPanel() {
-    NSApp.activate(ignoringOtherApps: true)
-    let panel = NSOpenPanel()
-    panel.title = "Import focus sound"
-    panel.message = "Video or audio files are converted to a 10-minute M4A loop."
-    panel.allowsMultipleSelection = false
-    panel.canChooseDirectories = false
-    panel.canChooseFiles = true
-    panel.allowedContentTypes = [.audio, .movie, .mpeg4Movie, .mpeg4Audio, .mp3, .aiff, .wav]
-      + SoundImport.supportedExtensions
-        .filter { !["m4a", "mp4", "mov", "mp3", "aiff", "wav", "aac"].contains($0) }
-        .compactMap { UTType(filenameExtension: $0) }
-
-    let handleResponse: (NSApplication.ModalResponse) -> Void = { response in
-      guard response == .OK, let url = panel.url else { return }
-      Task { await model.importSound(from: url) }
+  private var importHint: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Text("Import or drop a file. Converts to audio-only M4A, max 10 minutes.")
+      Text("This window closes while the file picker is open — reopen it to see progress.")
     }
+    .font(.caption)
+    .foregroundStyle(.secondary)
+  }
 
-    if let hostWindow {
-      panel.beginSheetModal(for: hostWindow, completionHandler: handleResponse)
-    } else {
-      panel.begin(completionHandler: handleResponse)
-    }
+  private var dropZone: some View {
+    RoundedRectangle(cornerRadius: 8, style: .continuous)
+      .strokeBorder(isDropTargeted ? Color.accentColor : Color.secondary.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [5]))
+      .background(isDropTargeted ? Color.accentColor.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+      .frame(height: 44)
+      .overlay {
+        Text("Drop audio or video here")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+      .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
+        guard let provider = providers.first else { return false }
+        provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+          guard let data = item as? Data, let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
+          Task { @MainActor in await model.importSound(from: url) }
+        }
+        return true
+      }
   }
 }
