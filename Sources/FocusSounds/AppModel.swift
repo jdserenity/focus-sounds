@@ -21,13 +21,14 @@ final class AppModel {
   private var clockMs = 0
   private var monitorTimer: DispatchSourceTimer?
 
-  var sounds: [FocusSound] = SoundCatalog.bundledSounds()
+  var sounds: [FocusSound] = SoundCatalog.allSounds()
   var selectedSoundID: String?
   var isPlaying = false
+  var isImporting = false
   var isDucked = false
   var permissionState: PermissionState = .unknown
   var externalLevel: Float = 0
-  var statusMessage = "Add audio files to Sounds/, then rebuild."
+  var statusMessage = "Import a sound to get started."
   var focusVolume: Float
 
   var selectedSound: FocusSound? {
@@ -52,9 +53,37 @@ final class AppModel {
     }
   }
 
+  func importSound(from url: URL) async {
+    guard !isImporting else { return }
+    isImporting = true
+    statusMessage = "Importing and converting…"
+    defer { isImporting = false }
+
+    let directory = SoundCatalog.importedSoundsDirectory()
+    let existing = SoundCatalog.existingImportedFilenames()
+    do {
+      let outputURL = try await Task.detached {
+        try await SoundImporter().importSound(from: url, to: directory, existingFilenames: existing)
+      }.value
+      reloadSounds()
+      let sound = SoundCatalog.focusSound(for: outputURL)
+      selectSound(sound)
+      statusMessage = "Imported \(sound.title) (audio only, up to 10 min)."
+    } catch {
+      statusMessage = "Import failed: \(error.localizedDescription)"
+    }
+  }
+
+  func reloadSounds() {
+    sounds = SoundCatalog.allSounds()
+    if let selectedSoundID, !sounds.contains(where: { $0.id == selectedSoundID }) {
+      self.selectedSoundID = sounds.first?.id
+    }
+  }
+
   func play() {
     guard let sound = selectedSound else {
-      statusMessage = "No sounds bundled. Copy files into Sounds/ and run scripts/build-app.sh."
+      statusMessage = "No sounds yet. Use Import to add one."
       return
     }
 

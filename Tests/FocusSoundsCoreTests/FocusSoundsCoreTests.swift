@@ -53,4 +53,31 @@ final class FocusSoundsCoreTests: XCTestCase {
     let done = fader.step(baseVolume: 0.8, isDucked: false, dtMs: 100)
     XCTAssertEqual(done, 0.8, accuracy: 0.01)
   }
+
+  func testSoundImportClampsDurationToTenMinutes() {
+    XCTAssertEqual(SoundImport.clampedDuration(sourceSeconds: 120), 120)
+    XCTAssertEqual(SoundImport.clampedDuration(sourceSeconds: 12_000), SoundImport.maxDurationSeconds)
+    XCTAssertEqual(SoundImport.clampedDuration(sourceSeconds: -5), 0)
+  }
+
+  func testSoundImportSanitizesFilenames() {
+    XCTAssertEqual(
+      SoundImport.sanitizedBaseName(from: "Forest Sounds _ Woodland Ambience, Bird Song.mp4"),
+      "forest-sounds-woodland-ambience-bird-song"
+    )
+    XCTAssertEqual(SoundImport.outputFilename(baseName: "My Loop!!!.mp4"), "my-loop.m4a")
+  }
+
+  func testSoundImportDeduplicatesOutputNames() {
+    let existing = ["forest.m4a", "forest-2.m4a"]
+    XCTAssertEqual(SoundImport.deduplicatedFilename(baseName: "Forest", existingFilenames: existing), "forest-3.m4a")
+    XCTAssertEqual(SoundImport.deduplicatedFilename(baseName: "Rain", existingFilenames: ["other.m4a"]), "rain.m4a")
+  }
+
+  func testSoundImportDisplayTitle() {
+    XCTAssertEqual(
+      SoundImport.displayTitle(fromFilename: "forest-sounds.m4a"),
+      "forest sounds"
+    )
+  }
 }

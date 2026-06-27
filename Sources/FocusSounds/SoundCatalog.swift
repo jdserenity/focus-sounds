@@ -1,3 +1,4 @@
+import FocusSoundsCore
 import Foundation
 
 struct FocusSound: Identifiable, Hashable {
@@ -7,30 +8,54 @@ struct FocusSound: Identifiable, Hashable {
 }
 
 enum SoundCatalog {
-  private static let supportedExtensions = ["mp3", "wav", "m4a", "mp4", "aiff", "aac", "caf", "flac"]
+  private static let supportedExtensions = SoundImport.supportedExtensions
+
+  static func importedSoundsDirectory() -> URL {
+    FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+      .appendingPathComponent("FocusSounds/Sounds", isDirectory: true)
+  }
+
+  static func allSounds() -> [FocusSound] {
+    let bundled = bundledSounds()
+    let imported = sounds(in: importedSoundsDirectory(), createIfMissing: false)
+    return (bundled + imported)
+      .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+  }
+
+  static func existingImportedFilenames() -> [String] {
+    sounds(in: importedSoundsDirectory(), createIfMissing: false).map(\.id)
+  }
+
+  static func focusSound(for url: URL) -> FocusSound {
+    let id = url.lastPathComponent
+    let title = SoundImport.displayTitle(fromFilename: id)
+    return FocusSound(id: id, title: title, url: url)
+  }
 
   static func bundledSounds() -> [FocusSound] {
-    guard let soundsRoot = locateSoundsDirectory(),
-          let entries = try? FileManager.default.contentsOfDirectory(
-            at: soundsRoot,
-            includingPropertiesForKeys: nil,
-            options: [.skipsHiddenFiles]
-          ) else {
+    guard let soundsRoot = locateBundledSoundsDirectory() else { return [] }
+    return sounds(in: soundsRoot, createIfMissing: false)
+  }
+
+  private static func sounds(in directory: URL, createIfMissing: Bool) -> [FocusSound] {
+    if createIfMissing {
+      try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    }
+    guard let entries = try? FileManager.default.contentsOfDirectory(
+      at: directory,
+      includingPropertiesForKeys: nil,
+      options: [.skipsHiddenFiles]
+    ) else {
       return []
     }
 
     return entries
       .filter { supportedExtensions.contains($0.pathExtension.lowercased()) }
       .sorted { $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending }
-      .map { url in
-        let title = url.deletingPathExtension().lastPathComponent
-          .replacingOccurrences(of: "_", with: " ")
-          .replacingOccurrences(of: "-", with: " ")
-        return FocusSound(id: url.lastPathComponent, title: title, url: url)
-      }
+      .map { focusSound(for: $0) }
   }
 
-  private static func locateSoundsDirectory() -> URL? {
+  private static func locateBundledSoundsDirectory() -> URL? {
     let candidates: [URL] = [
       Bundle.main.resourceURL?.appendingPathComponent("Sounds", isDirectory: true),
       Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/Sounds", isDirectory: true),

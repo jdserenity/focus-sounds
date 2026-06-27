@@ -13,7 +13,9 @@ Native macOS menu bar app. Plays dev-bundled focus sounds on loop. When other sy
 
 ## Sound bundling
 
-Drop files in repo-root `Sounds/`. `scripts/build-app.sh` copies them into the app bundle at `Contents/Resources/Sounds/`.
+Imported sounds are converted in-app: video is stripped, output is audio-only M4A, duration capped at 10 minutes. Stored at `~/Library/Application Support/FocusSounds/Sounds/`. Use **Import…** in the menu bar window.
+
+Optional dev bundling: drop files in repo-root `Sounds/`. `scripts/build-app.sh` copies them into the app bundle at `Contents/Resources/Sounds/` (not auto-converted at build time).
 
 ## Permissions
 

@@ -1,4 +1,7 @@
+import AppKit
+import FocusSoundsCore
 import SwiftUI
+import UniformTypeIdentifiers
 
 @available(macOS 14.2, *)
 struct MenuBarView: View {
@@ -10,10 +13,10 @@ struct MenuBarView: View {
         .font(.headline)
 
       if model.sounds.isEmpty {
-        Text("No sounds found in the app bundle.")
+        Text("No sounds yet.")
           .font(.caption)
           .foregroundStyle(.secondary)
-        Text("Copy your files into focus-sounds/Sounds/ then run scripts/build-app.sh")
+        Text("Import converts to audio-only M4A and trims to 10 minutes.")
           .font(.caption)
           .foregroundStyle(.secondary)
       } else {
@@ -36,6 +39,15 @@ struct MenuBarView: View {
           model.togglePlayPause()
         }
         .keyboardShortcut(.return, modifiers: [])
+        .disabled(model.sounds.isEmpty || model.isImporting)
+
+        Button("Import…") { presentImportPanel() }
+          .disabled(model.isImporting)
+
+        if model.isImporting {
+          ProgressView()
+            .controlSize(.small)
+        }
 
         if model.isPlaying, model.isDucked {
           Label("Ducked", systemImage: "speaker.wave.1.fill")
@@ -93,5 +105,20 @@ struct MenuBarView: View {
     }
     .padding()
     .frame(width: 300)
+  }
+
+  private func presentImportPanel() {
+    let panel = NSOpenPanel()
+    panel.title = "Import focus sound"
+    panel.message = "Video or audio files are converted to a 10-minute M4A loop."
+    panel.allowsMultipleSelection = false
+    panel.canChooseDirectories = false
+    panel.canChooseFiles = true
+    panel.allowedContentTypes = [.audio, .movie, .mpeg4Movie, .mpeg4Audio, .mp3, .aiff, .wav]
+      + SoundImport.supportedExtensions
+        .filter { !["m4a", "mp4", "mov", "mp3", "aiff", "wav", "aac"].contains($0) }
+        .compactMap { UTType(filenameExtension: $0) }
+    guard panel.runModal() == .OK, let url = panel.url else { return }
+    Task { await model.importSound(from: url) }
   }
 }
