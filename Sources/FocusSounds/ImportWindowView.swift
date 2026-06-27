@@ -7,6 +7,8 @@ struct ImportWindowView: View {
   @Environment(\.dismissWindow) private var dismissWindow
   @State private var showFileImporter = false
   @State private var isDropTargeted = false
+  @State private var pendingURL: URL?
+  @State private var pendingHasSecurityAccess = false
 
   var body: some View {
     ZStack {
@@ -17,8 +19,11 @@ struct ImportWindowView: View {
         idleContent
       }
     }
-    .frame(width: 340, height: model.isImporting ? 220 : 260)
+    .frame(width: 340, height: model.isImporting ? 220 : (pendingURL == nil ? 260 : 280))
     .animation(.easeInOut(duration: 0.2), value: model.isImporting)
+    .animation(.easeInOut(duration: 0.2), value: pendingURL != nil)
+    .onAppear { if !model.isImporting { clearPending() } }
+    .onDisappear { clearPending() }
     .fileImporter(
       isPresented: $showFileImporter,
       allowedContentTypes: SoundImportTypes.all,
@@ -27,9 +32,9 @@ struct ImportWindowView: View {
       switch result {
       case .success(let urls):
         guard let url = urls.first else { return }
-        Task { await model.importSound(from: url) }
+        setPending(url)
       case .failure(let error):
-        AppAlert.show(title: "Import failed", message: error.localizedDescription)
+        AppAlert.show(title: "Could not open file", message: error.localizedDescription)
       }
     }
   }
@@ -44,15 +49,40 @@ struct ImportWindowView: View {
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
 
-      dropZone
+      if let pendingURL {
+        selectedFileRow(pendingURL)
+      } else {
+        dropZone
+      }
 
       HStack {
-        Button("Choose file…") { showFileImporter = true }
+        Button(pendingURL == nil ? "Choose file…" : "Choose different file…") { showFileImporter = true }
         Spacer()
-        Button("Close") { dismissWindow(id: "import-sound") }
+        Button("Convert") { convert() }
+          .keyboardShortcut(.defaultAction)
+          .disabled(pendingURL == nil)
       }
     }
     .padding(20)
+  }
+
+  private func selectedFileRow(_ url: URL) -> some View {
+    HStack(spacing: 10) {
+      Image(systemName: "doc.fill")
+        .foregroundStyle(.tint)
+      VStack(alignment: .leading, spacing: 2) {
+        Text("Ready to convert")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+        Text(url.lastPathComponent)
+          .font(.callout)
+          .lineLimit(2)
+      }
+      Spacer()
+    }
+    .padding(12)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
   }
 
   private var dropZone: some View {
@@ -74,9 +104,34 @@ struct ImportWindowView: View {
         guard let provider = providers.first else { return false }
         provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
           guard let data = item as? Data, let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
-          Task { @MainActor in await model.importSound(from: url) }
+          Task { @MainActor in setPending(url) }
         }
         return true
       }
+  }
+
+  private func setPending(_ url: URL) {
+    clearPending()
+    pendingURL = url
+    pendingHasSecurityAccess = url.startAccessingSecurityScopedResource()
+  }
+
+  private func clearPending() {
+    if pendingHasSecurityAccess, let pendingURL {
+      pendingURL.stopAccessingSecurityScopedResource()
+    }
+    pendingURL = nil
+    pendingHasSecurityAccess = false
+  }
+
+  private func convert() {
+    guard let url = pendingURL else { return }
+    Task {
+      let ok = await model.importSound(from: url)
+      if ok {
+        clearPending()
+        dismissWindow(id: "import-sound")
+      }
+    }
   }
 }

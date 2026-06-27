@@ -37,6 +37,10 @@ final class AppModel {
     return sounds.first { $0.id == selectedSoundID } ?? sounds.first
   }
 
+  var canDeleteSelectedSound: Bool {
+    selectedSound?.isImported == true
+  }
+
   init() {
     let stored = UserDefaults.standard.float(forKey: Self.focusVolumeKey)
     focusVolume = stored > 0 ? stored : 0.75
@@ -51,16 +55,12 @@ final class AppModel {
     }
   }
 
-  func importSound(from url: URL) async {
-    guard !isImporting else { return }
+  @discardableResult
+  func importSound(from url: URL) async -> Bool {
+    guard !isImporting else { return false }
     isImporting = true
     importProgress = 0
     importFileName = url.deletingPathExtension().lastPathComponent
-    defer {
-      isImporting = false
-      importProgress = 0
-      importFileName = ""
-    }
 
     let directory = SoundCatalog.importedSoundsDirectory()
     let existing = SoundCatalog.existingImportedFilenames()
@@ -74,9 +74,30 @@ final class AppModel {
       }.value
       importProgress = 1
       reloadSounds()
-      selectSound(SoundCatalog.focusSound(for: outputURL))
+      selectSound(SoundCatalog.focusSound(for: outputURL, isImported: true))
+      try await Task.sleep(nanoseconds: 500_000_000)
+      isImporting = false
+      importProgress = 0
+      importFileName = ""
+      return true
     } catch {
+      isImporting = false
+      importProgress = 0
+      importFileName = ""
       AppAlert.show(title: "Import failed", message: error.localizedDescription)
+      return false
+    }
+  }
+
+  func deleteSelectedSound() {
+    guard let sound = selectedSound, sound.isImported else { return }
+    pause()
+    player.stop()
+    do {
+      try SoundCatalog.deleteImportedSound(sound)
+      reloadSounds()
+    } catch {
+      AppAlert.show(title: "Could not delete", message: error.localizedDescription)
     }
   }
 

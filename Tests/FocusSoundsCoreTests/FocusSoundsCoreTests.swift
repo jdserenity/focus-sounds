@@ -80,4 +80,12 @@ final class FocusSoundsCoreTests: XCTestCase {
       "forest sounds"
     )
   }
+
+  func testSoundImportDetectsFileInsideDirectory() {
+    let dir = URL(fileURLWithPath: "/tmp/FocusSounds/Sounds", isDirectory: true)
+    let file = dir.appendingPathComponent("rain.m4a")
+    let outside = URL(fileURLWithPath: "/tmp/other/rain.m4a")
+    XCTAssertTrue(SoundImport.isContainedIn(directory: dir, file: file))
+    XCTAssertFalse(SoundImport.isContainedIn(directory: dir, file: outside))
+  }
 }

@@ -30,6 +30,13 @@ struct MenuBarView: View {
             Text(sound.title).tag(sound.id)
           }
         }
+
+        if model.canDeleteSelectedSound {
+          Button("Delete sound", role: .destructive) {
+            model.deleteSelectedSound()
+          }
+          .font(.caption)
+        }
       }
 
       HStack {

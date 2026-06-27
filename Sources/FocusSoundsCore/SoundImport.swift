@@ -41,4 +41,10 @@ public enum SoundImport {
       n += 1
     }
   }
+
+  public static func isContainedIn(directory: URL, file: URL) -> Bool {
+    let dir = directory.standardizedFileURL.path
+    let path = file.standardizedFileURL.path
+    return path == dir || path.hasPrefix(dir + "/")
+  }
 }
