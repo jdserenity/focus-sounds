@@ -23,10 +23,18 @@ enum SoundImporterError: LocalizedError {
 }
 
 struct SoundImporter {
-  func importSound(from sourceURL: URL, to directory: URL, existingFilenames: [String]) async throws -> URL {
+  typealias ProgressHandler = @Sendable (Float) -> Void
+
+  func importSound(
+    from sourceURL: URL,
+    to directory: URL,
+    existingFilenames: [String],
+    progress: ProgressHandler? = nil
+  ) async throws -> URL {
     let didAccess = sourceURL.startAccessingSecurityScopedResource()
     defer { if didAccess { sourceURL.stopAccessingSecurityScopedResource() } }
 
+    progress?(0.02)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
     let baseName = sourceURL.deletingPathExtension().lastPathComponent
@@ -37,6 +45,7 @@ struct SoundImporter {
     }
 
     let asset = AVURLAsset(url: sourceURL)
+    progress?(0.06)
     let sourceTracks = try await asset.loadTracks(withMediaType: .audio)
     guard let sourceTrack = sourceTracks.first else { throw SoundImporterError.noAudioTrack }
 
@@ -46,6 +55,7 @@ struct SoundImporter {
       start: .zero,
       duration: CMTime(seconds: exportSeconds, preferredTimescale: 600)
     )
+    progress?(0.10)
 
     let composition = AVMutableComposition()
     guard let track = composition.addMutableTrack(
@@ -63,23 +73,41 @@ struct SoundImporter {
     session.outputFileType = .m4a
     session.timeRange = CMTimeRange(start: .zero, duration: timeRange.duration)
 
-    try await export(session)
+    try await export(session) { exportProgress in
+      progress?(0.10 + exportProgress * 0.90)
+    }
+    progress?(1)
     return outputURL
   }
 
-  private func export(_ session: AVAssetExportSession) async throws {
+  private func export(_ session: AVAssetExportSession, progress: @escaping @Sendable (Float) -> Void) async throws {
+    let pollTask = Task {
+      while !Task.isCancelled {
+        let status = session.status
+        if status == .exporting || status == .waiting {
+          progress(Float(session.progress))
+        }
+        if status == .completed || status == .failed || status == .cancelled { break }
+        try await Task.sleep(nanoseconds: 50_000_000)
+      }
+    }
+    defer { pollTask.cancel() }
+
     try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
       session.exportAsynchronously {
-        switch session.status {
+        let status = session.status
+        let error = session.error
+        switch status {
         case .completed:
+          progress(1)
           continuation.resume()
         case .cancelled:
           continuation.resume(throwing: SoundImporterError.cancelled)
         case .failed:
-          let detail = session.error?.localizedDescription ?? "unknown error"
+          let detail = error?.localizedDescription ?? "unknown error"
           continuation.resume(throwing: SoundImporterError.exportFailed(detail))
         default:
-          continuation.resume(throwing: SoundImporterError.exportFailed("status \(session.status.rawValue)"))
+          continuation.resume(throwing: SoundImporterError.exportFailed("status \(status.rawValue)"))
         }
       }
     }

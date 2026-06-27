@@ -25,6 +25,8 @@ final class AppModel {
   var selectedSoundID: String?
   var isPlaying = false
   var isImporting = false
+  var importProgress: Float = 0
+  var importFileName = ""
   var isDucked = false
   var permissionState: PermissionState = .unknown
   var externalLevel: Float = 0
@@ -56,15 +58,26 @@ final class AppModel {
   func importSound(from url: URL) async {
     guard !isImporting else { return }
     isImporting = true
-    statusMessage = "Importing and converting…"
-    defer { isImporting = false }
+    importProgress = 0
+    importFileName = url.deletingPathExtension().lastPathComponent
+    statusMessage = "Preparing audio…"
+    defer {
+      isImporting = false
+      importProgress = 0
+      importFileName = ""
+    }
 
     let directory = SoundCatalog.importedSoundsDirectory()
     let existing = SoundCatalog.existingImportedFilenames()
     do {
       let outputURL = try await Task.detached {
-        try await SoundImporter().importSound(from: url, to: directory, existingFilenames: existing)
+        try await SoundImporter().importSound(from: url, to: directory, existingFilenames: existing) { progress in
+          Task { @MainActor in
+            self.importProgress = progress
+          }
+        }
       }.value
+      importProgress = 1
       reloadSounds()
       let sound = SoundCatalog.focusSound(for: outputURL)
       selectSound(sound)

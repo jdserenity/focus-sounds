@@ -8,6 +8,22 @@ struct MenuBarView: View {
   @Bindable var model: AppModel
 
   var body: some View {
+    ZStack {
+      mainContent
+        .disabled(model.isImporting)
+        .opacity(model.isImporting ? 0.4 : 1)
+
+      if model.isImporting {
+        ImportPreparingView(fileName: model.importFileName, progress: model.importProgress)
+          .transition(.opacity.combined(with: .scale(scale: 0.98)))
+      }
+    }
+    .animation(.easeInOut(duration: 0.2), value: model.isImporting)
+    .padding()
+    .frame(width: 300)
+  }
+
+  private var mainContent: some View {
     VStack(alignment: .leading, spacing: 12) {
       Text("Focus Sounds")
         .font(.headline)
@@ -43,11 +59,6 @@ struct MenuBarView: View {
 
         Button("Import…") { presentImportPanel() }
           .disabled(model.isImporting)
-
-        if model.isImporting {
-          ProgressView()
-            .controlSize(.small)
-        }
 
         if model.isPlaying, model.isDucked {
           Label("Ducked", systemImage: "speaker.wave.1.fill")
@@ -103,8 +114,6 @@ struct MenuBarView: View {
 
       Button("Quit") { NSApplication.shared.terminate(nil) }
     }
-    .padding()
-    .frame(width: 300)
   }
 
   private func presentImportPanel() {
