@@ -30,7 +30,6 @@ final class AppModel {
   var isDucked = false
   var permissionState: PermissionState = .unknown
   var externalLevel: Float = 0
-  var statusMessage = "Import a sound to get started."
   var focusVolume: Float
 
   var selectedSound: FocusSound? {
@@ -42,9 +41,6 @@ final class AppModel {
     let stored = UserDefaults.standard.float(forKey: Self.focusVolumeKey)
     focusVolume = stored > 0 ? stored : 0.75
     selectedSoundID = sounds.first?.id
-    if !sounds.isEmpty {
-      statusMessage = "Ready. Press play to start focus audio."
-    }
   }
 
   func togglePlayPause() {
@@ -60,7 +56,6 @@ final class AppModel {
     isImporting = true
     importProgress = 0
     importFileName = url.deletingPathExtension().lastPathComponent
-    statusMessage = "Preparing audio…"
     defer {
       isImporting = false
       importProgress = 0
@@ -79,11 +74,9 @@ final class AppModel {
       }.value
       importProgress = 1
       reloadSounds()
-      let sound = SoundCatalog.focusSound(for: outputURL)
-      selectSound(sound)
-      statusMessage = "Imported \(sound.title) (audio only, up to 10 min)."
+      selectSound(SoundCatalog.focusSound(for: outputURL))
     } catch {
-      statusMessage = "Import failed: \(error.localizedDescription)"
+      AppAlert.show(title: "Import failed", message: error.localizedDescription)
     }
   }
 
@@ -95,10 +88,7 @@ final class AppModel {
   }
 
   func play() {
-    guard let sound = selectedSound else {
-      statusMessage = "No sounds yet. Use Import to add one."
-      return
-    }
+    guard let sound = selectedSound else { return }
 
     do {
       if !player.hasLoadedItem {
@@ -108,15 +98,13 @@ final class AppModel {
       try player.play()
       isPlaying = true
       applyVolume()
-      statusMessage = "Playing \(sound.title)."
       do {
         try startMonitoringIfNeeded()
       } catch {
         permissionState = .denied
-        statusMessage = "Playing \(sound.title). Ducking unavailable: \(error.localizedDescription)"
       }
     } catch {
-      statusMessage = "Could not start: \(error.localizedDescription)"
+      AppAlert.show(title: "Could not play", message: error.localizedDescription)
       isPlaying = false
     }
   }
@@ -128,7 +116,6 @@ final class AppModel {
     monitorTimer = nil
     isPlaying = false
     externalLevel = 0
-    statusMessage = "Paused."
   }
 
   func setFocusVolume(_ volume: Float) {
@@ -160,9 +147,6 @@ final class AppModel {
     clockMs = 0
     ducking = DuckingController()
     volumeFader = VolumeFader(current: focusVolume)
-    if let title = selectedSound?.title {
-      statusMessage = "Selected \(title). Press play to start."
-    }
   }
 
   private func startMonitoringIfNeeded() throws {

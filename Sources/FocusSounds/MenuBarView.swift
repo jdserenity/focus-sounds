@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 @available(macOS 14.2, *)
 struct MenuBarView: View {
   @Bindable var model: AppModel
+  @State private var hostWindow: NSWindow?
 
   var body: some View {
     ZStack {
@@ -18,6 +19,7 @@ struct MenuBarView: View {
           .transition(.opacity.combined(with: .scale(scale: 0.98)))
       }
     }
+    .background(WindowAccessor { hostWindow = $0 })
     .animation(.easeInOut(duration: 0.2), value: model.isImporting)
     .padding()
     .frame(width: 300)
@@ -99,11 +101,6 @@ struct MenuBarView: View {
         }
       }
 
-      Text(model.statusMessage)
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .fixedSize(horizontal: false, vertical: true)
-
       if model.permissionState == .denied {
         Text("Grant System Audio Recording in System Settings → Privacy & Security if prompted.")
           .font(.caption2)
@@ -117,6 +114,7 @@ struct MenuBarView: View {
   }
 
   private func presentImportPanel() {
+    NSApp.activate(ignoringOtherApps: true)
     let panel = NSOpenPanel()
     panel.title = "Import focus sound"
     panel.message = "Video or audio files are converted to a 10-minute M4A loop."
@@ -127,7 +125,16 @@ struct MenuBarView: View {
       + SoundImport.supportedExtensions
         .filter { !["m4a", "mp4", "mov", "mp3", "aiff", "wav", "aac"].contains($0) }
         .compactMap { UTType(filenameExtension: $0) }
-    guard panel.runModal() == .OK, let url = panel.url else { return }
-    Task { await model.importSound(from: url) }
+
+    let handleResponse: (NSApplication.ModalResponse) -> Void = { response in
+      guard response == .OK, let url = panel.url else { return }
+      Task { await model.importSound(from: url) }
+    }
+
+    if let hostWindow {
+      panel.beginSheetModal(for: hostWindow, completionHandler: handleResponse)
+    } else {
+      panel.begin(completionHandler: handleResponse)
+    }
   }
 }
