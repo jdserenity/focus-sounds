@@ -10,5 +10,10 @@ struct FocusSoundsApp: App {
       MenuBarView(model: model)
     }
     .menuBarExtraStyle(.window)
+
+    Window("Import Sound", id: "import-sound") {
+      ImportWindowView(model: model)
+    }
+    .windowResizability(.contentSize)
   }
 }
