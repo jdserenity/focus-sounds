@@ -213,4 +213,35 @@ final class FocusSoundsCoreTests: XCTestCase {
       .inactive
     )
   }
+
+  func testLoopCrossfadeClampsDurationOnShortTracks() {
+    XCTAssertEqual(LoopCrossfade.effectiveCrossfadeSeconds(trackDurationSeconds: 10), 2.5)
+    XCTAssertEqual(LoopCrossfade.effectiveCrossfadeSeconds(trackDurationSeconds: 3), 1.5, accuracy: 0.001)
+  }
+
+  func testLoopCrossfadeBeginsNearTrackEnd() {
+    XCTAssertFalse(LoopCrossfade.shouldBeginCrossfade(currentSeconds: 5, trackDurationSeconds: 10, crossfadeSeconds: 2.5, isCrossfading: false))
+    XCTAssertTrue(LoopCrossfade.shouldBeginCrossfade(currentSeconds: 7.6, trackDurationSeconds: 10, crossfadeSeconds: 2.5, isCrossfading: false))
+    XCTAssertFalse(LoopCrossfade.shouldBeginCrossfade(currentSeconds: 9, trackDurationSeconds: 10, crossfadeSeconds: 2.5, isCrossfading: true))
+  }
+
+  func testLoopCrossfadeEqualPowerBlend() {
+    let start = LoopCrossfade.channelVolumes(progress: 0)
+    XCTAssertEqual(start.outgoing, 1, accuracy: 0.001)
+    XCTAssertEqual(start.incoming, 0, accuracy: 0.001)
+    let mid = LoopCrossfade.channelVolumes(progress: 0.5)
+    XCTAssertEqual(mid.outgoing, mid.incoming, accuracy: 0.001)
+    let end = LoopCrossfade.channelVolumes(progress: 1)
+    XCTAssertEqual(end.outgoing, 0, accuracy: 0.001)
+    XCTAssertEqual(end.incoming, 1, accuracy: 0.001)
+  }
+
+  func testGlobalHotkeyDefaultLabel() {
+    XCTAssertEqual(GlobalHotkey.default.displayLabel, "⌃⌥Space")
+    XCTAssertTrue(GlobalHotkey.default.isValid)
+  }
+
+  func testGlobalHotkeyRejectsBareKey() {
+    XCTAssertNil(GlobalHotkey.from(eventKeyCode: 49, carbonModifiers: 0))
+  }
 }
