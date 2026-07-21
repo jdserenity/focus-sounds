@@ -181,4 +181,36 @@ final class FocusSoundsCoreTests: XCTestCase {
     XCTAssertEqual(controller.update(kind: .headphones, isPlaying: true), .none)
     XCTAssertEqual(controller.update(kind: .headphones, isPlaying: true), .none)
   }
+
+  func testNowPlayingPresentationActiveWhilePlaying() {
+    XCTAssertEqual(
+      NowPlayingPresentationBuilder.make(title: "rain", isPlaying: true, hasSession: true),
+      .active(title: "rain", isPlaying: true)
+    )
+  }
+
+  func testNowPlayingPresentationStaysActiveWhilePaused() {
+    XCTAssertEqual(
+      NowPlayingPresentationBuilder.make(title: "rain", isPlaying: false, hasSession: true),
+      .active(title: "rain", isPlaying: false)
+    )
+  }
+
+  func testNowPlayingPresentationInactiveWithoutSession() {
+    XCTAssertEqual(
+      NowPlayingPresentationBuilder.make(title: "rain", isPlaying: false, hasSession: false),
+      .inactive
+    )
+  }
+
+  func testNowPlayingPresentationInactiveWithoutTitle() {
+    XCTAssertEqual(
+      NowPlayingPresentationBuilder.make(title: nil, isPlaying: true, hasSession: true),
+      .inactive
+    )
+    XCTAssertEqual(
+      NowPlayingPresentationBuilder.make(title: "", isPlaying: true, hasSession: true),
+      .inactive
+    )
+  }
 }
