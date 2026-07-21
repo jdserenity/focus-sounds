@@ -16,8 +16,10 @@ final class AppModel {
 
   private let player = FocusPlayer()
   private let monitor = SystemAudioMonitor()
+  private let outputRouteMonitor = OutputRouteMonitor()
   private var ducking = DuckingController()
   private var volumeFader = VolumeFader()
+  private var headphoneAutoPause = HeadphoneAutoPauseController()
   private var clockMs = 0
   private var monitorTimer: DispatchSourceTimer?
 
@@ -45,13 +47,14 @@ final class AppModel {
     let stored = UserDefaults.standard.float(forKey: Self.focusVolumeKey)
     focusVolume = stored > 0 ? stored : 0.75
     selectedSoundID = sounds.first?.id
+    startOutputRouteMonitoring()
   }
 
   func togglePlayPause() {
     if isPlaying {
-      pause()
+      pause(manual: true)
     } else {
-      play()
+      play(manual: true)
     }
   }
 
@@ -91,7 +94,7 @@ final class AppModel {
 
   func deleteSelectedSound() {
     guard let sound = selectedSound, sound.isImported else { return }
-    pause()
+    pause(manual: true)
     player.stop()
     do {
       try SoundCatalog.deleteImportedSound(sound)
@@ -108,8 +111,9 @@ final class AppModel {
     }
   }
 
-  func play() {
+  func play(manual: Bool = true) {
     guard let sound = selectedSound else { return }
+    if manual { headphoneAutoPause.noteManualPlay() }
 
     do {
       if !player.hasLoadedItem {
@@ -130,7 +134,8 @@ final class AppModel {
     }
   }
 
-  func pause() {
+  func pause(manual: Bool = true) {
+    if manual { headphoneAutoPause.noteManualPause() }
     player.pause()
     monitor.stop()
     monitorTimer?.cancel()
@@ -158,6 +163,7 @@ final class AppModel {
 
   func selectSound(_ sound: FocusSound) {
     selectedSoundID = sound.id
+    headphoneAutoPause.noteManualPause()
     player.stop()
     monitor.stop()
     monitorTimer?.cancel()
@@ -168,6 +174,27 @@ final class AppModel {
     clockMs = 0
     ducking = DuckingController()
     volumeFader = VolumeFader(current: focusVolume)
+  }
+
+  private func startOutputRouteMonitoring() {
+    do {
+      try outputRouteMonitor.start { [weak self] kind in
+        Task { @MainActor in self?.handleOutputKind(kind) }
+      }
+    } catch {
+      // Route monitoring is best-effort; playback still works without auto-pause.
+    }
+  }
+
+  private func handleOutputKind(_ kind: AudioOutputKind) {
+    switch headphoneAutoPause.update(kind: kind, isPlaying: isPlaying) {
+    case .none:
+      break
+    case .pause:
+      pause(manual: false)
+    case .resume:
+      play(manual: false)
+    }
   }
 
   private func startMonitoringIfNeeded() throws {

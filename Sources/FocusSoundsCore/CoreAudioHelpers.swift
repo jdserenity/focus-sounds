@@ -28,8 +28,16 @@ public extension AudioObjectID {
   }
 
   static func defaultSystemOutputDeviceID() throws -> AudioDeviceID {
+    try deviceID(for: kAudioHardwarePropertyDefaultSystemOutputDevice, label: "default system output device")
+  }
+
+  static func defaultOutputDeviceID() throws -> AudioDeviceID {
+    try deviceID(for: kAudioHardwarePropertyDefaultOutputDevice, label: "default output device")
+  }
+
+  private static func deviceID(for selector: AudioObjectPropertySelector, label: String) throws -> AudioDeviceID {
     var address = AudioObjectPropertyAddress(
-      mSelector: kAudioHardwarePropertyDefaultSystemOutputDevice,
+      mSelector: selector,
       mScope: kAudioObjectPropertyScopeGlobal,
       mElement: kAudioObjectPropertyElementMain
     )
@@ -37,7 +45,7 @@ public extension AudioObjectID {
     var dataSize = UInt32(MemoryLayout<AudioDeviceID>.size)
     let err = AudioObjectGetPropertyData(system, &address, 0, nil, &dataSize, &deviceID)
     guard err == noErr, deviceID.isValid else {
-      throw CoreAudioHelperError.propertyReadFailed("default output device: \(err)")
+      throw CoreAudioHelperError.propertyReadFailed("\(label): \(err)")
     }
     return deviceID
   }
@@ -72,6 +80,34 @@ public extension AudioObjectID {
       throw CoreAudioHelperError.propertyReadFailed("tap format: \(err)")
     }
     return description
+  }
+
+  func transportType() throws -> UInt32 {
+    var address = AudioObjectPropertyAddress(
+      mSelector: kAudioDevicePropertyTransportType,
+      mScope: kAudioObjectPropertyScopeGlobal,
+      mElement: kAudioObjectPropertyElementMain
+    )
+    var transport: UInt32 = 0
+    var dataSize = UInt32(MemoryLayout<UInt32>.size)
+    let err = AudioObjectGetPropertyData(self, &address, 0, nil, &dataSize, &transport)
+    guard err == noErr else {
+      throw CoreAudioHelperError.propertyReadFailed("transport type: \(err)")
+    }
+    return transport
+  }
+
+  func outputDataSource() -> UInt32? {
+    var address = AudioObjectPropertyAddress(
+      mSelector: kAudioDevicePropertyDataSource,
+      mScope: kAudioDevicePropertyScopeOutput,
+      mElement: kAudioObjectPropertyElementMain
+    )
+    var source: UInt32 = 0
+    var dataSize = UInt32(MemoryLayout<UInt32>.size)
+    let err = AudioObjectGetPropertyData(self, &address, 0, nil, &dataSize, &source)
+    guard err == noErr else { return nil }
+    return source
   }
 }
 
