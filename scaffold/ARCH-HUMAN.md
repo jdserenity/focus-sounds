@@ -9,3 +9,7 @@ Confirmed facts and decisions only. This is not a instruction manual for the app
 If I'm playing focus audio on headphones or earbuds and I take them out (or disconnect Bluetooth), the app pauses so sound doesn't jump to my speakers. If I plug those headphones back in, it starts playing again — but only when the pause happened because of the disconnect. If I paused myself, reconnecting does nothing.
 
 It treats wired jack headphones and Bluetooth/Bluetooth LE outputs as headphones. It does not try to guess USB speaker boxes vs USB headsets.
+
+## AirPods / media controls
+
+While Focus Sounds is playing (or paused with a sound still loaded), macOS treats it as the Now Playing app. That means the AirPods pause/play action and keyboard media keys control my focus audio instead of opening Apple Music.

@@ -11,3 +11,8 @@ Broader stack/product layout: `scaffold/ARCHITECTURE.md`.
 - Headphones classification (`AudioOutputClassifier`): Bluetooth / Bluetooth LE transport, or built-in output data source FourCC `hdpn`. Internal speakers `ispk` and other outputs → `.other` (USB DACs/headsets not special-cased).
 - `OutputRouteMonitor` observes `kAudioHardwarePropertyDefaultOutputDevice` + device `kAudioDevicePropertyDataSource` (output scope). `AppModel` applies `.pause`/`.resume` via `pause(manual:)` / `play(manual:)`; manual pause/play and `selectSound` clear the auto-resume flag.
 - Unit tests: `Tests/FocusSoundsCoreTests/FocusSoundsCoreTests.swift` (classifier + `HeadphoneAutoPauseController`). `swift test` requires full Xcode; Command Line Tools alone lack XCTest.
+
+## Now Playing / AirPods controls
+- While a sound session is loaded, app publishes to `MPNowPlayingInfoCenter` (`playbackState` + title/artist) and handles `MPRemoteCommandCenter` play/pause/toggle so AirPods stem / media keys control Focus Sounds instead of launching Music.
+- Presentation rules: `NowPlayingPresentationBuilder` — active while `hasLoadedItem` (playing or paused); inactive after stop/select clears the player. `NowPlayingController` applies MediaPlayer updates; macOS needs explicit `playbackState`.
+- Unit tests for presentation builder in `FocusSoundsCoreTests`.

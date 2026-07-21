@@ -17,6 +17,7 @@ final class AppModel {
   private let player = FocusPlayer()
   private let monitor = SystemAudioMonitor()
   private let outputRouteMonitor = OutputRouteMonitor()
+  private let nowPlaying = NowPlayingController()
   private var ducking = DuckingController()
   private var volumeFader = VolumeFader()
   private var headphoneAutoPause = HeadphoneAutoPauseController()
@@ -48,6 +49,7 @@ final class AppModel {
     focusVolume = stored > 0 ? stored : 0.75
     selectedSoundID = sounds.first?.id
     startOutputRouteMonitoring()
+    startNowPlaying()
   }
 
   func togglePlayPause() {
@@ -99,8 +101,10 @@ final class AppModel {
     do {
       try SoundCatalog.deleteImportedSound(sound)
       reloadSounds()
+      publishNowPlaying()
     } catch {
       AppAlert.show(title: "Could not delete", message: error.localizedDescription)
+      publishNowPlaying()
     }
   }
 
@@ -123,6 +127,7 @@ final class AppModel {
       try player.play()
       isPlaying = true
       applyVolume()
+      publishNowPlaying()
       do {
         try startMonitoringIfNeeded()
       } catch {
@@ -131,6 +136,7 @@ final class AppModel {
     } catch {
       AppAlert.show(title: "Could not play", message: error.localizedDescription)
       isPlaying = false
+      publishNowPlaying()
     }
   }
 
@@ -142,6 +148,7 @@ final class AppModel {
     monitorTimer = nil
     isPlaying = false
     externalLevel = 0
+    publishNowPlaying()
   }
 
   func setFocusVolume(_ volume: Float) {
@@ -174,6 +181,24 @@ final class AppModel {
     clockMs = 0
     ducking = DuckingController()
     volumeFader = VolumeFader(current: focusVolume)
+    publishNowPlaying()
+  }
+
+  private func startNowPlaying() {
+    nowPlaying.start(
+      onPlay: { [weak self] in self?.play(manual: true) },
+      onPause: { [weak self] in self?.pause(manual: true) },
+      onToggle: { [weak self] in self?.togglePlayPause() }
+    )
+  }
+
+  private func publishNowPlaying() {
+    let presentation = NowPlayingPresentationBuilder.make(
+      title: selectedSound?.title,
+      isPlaying: isPlaying,
+      hasSession: player.hasLoadedItem
+    )
+    nowPlaying.publish(presentation)
   }
 
   private func startOutputRouteMonitoring() {
