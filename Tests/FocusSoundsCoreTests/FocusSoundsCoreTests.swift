@@ -32,6 +32,20 @@ final class FocusSoundsCoreTests: XCTestCase {
     XCTAssertFalse(controller.isDucked)
   }
 
+  func testDefaultUnduckHoldIgnoresBriefSpeechPauses() {
+    var controller = DuckingController()
+    _ = controller.update(level: 1, nowMs: 0)
+    XCTAssertTrue(controller.update(level: 1, nowMs: 120))
+    XCTAssertTrue(controller.isDucked)
+
+    XCTAssertFalse(controller.update(level: 0, nowMs: 200))
+    XCTAssertFalse(controller.update(level: 0, nowMs: 650))
+    XCTAssertTrue(controller.isDucked)
+
+    XCTAssertTrue(controller.update(level: 0, nowMs: 2200))
+    XCTAssertFalse(controller.isDucked)
+  }
+
   func testVolumeFaderDucksSmoothly() {
     var fader = VolumeFader(current: 1, duckFadeMs: 100, restoreFadeMs: 100)
     let first = fader.step(baseVolume: 1, isDucked: true, dtMs: 50)

@@ -15,7 +15,7 @@ public struct DuckingController: Equatable {
     duckThreshold: Float = 0.012,
     unduckThreshold: Float = 0.007,
     duckHoldMs: Int = 120,
-    unduckHoldMs: Int = 450
+    unduckHoldMs: Int = 2000
   ) {
     self.isDucked = isDucked
     self.duckThreshold = duckThreshold

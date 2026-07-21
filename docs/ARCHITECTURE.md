@@ -2,7 +2,7 @@
 
 ## Product
 
-Native macOS menu bar app. Plays dev-bundled focus sounds on loop. When other system audio is detected, focus audio ducks to ~10% volume; restores when external audio stops.
+Native macOS menu bar app. Plays dev-bundled focus sounds on loop. When other system audio is detected, focus audio ducks to ~10% volume; restores after ~2s of quiet so brief speech pauses do not bring focus audio back.
 
 ## Stack
 
