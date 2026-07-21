@@ -102,4 +102,83 @@ final class FocusSoundsCoreTests: XCTestCase {
     XCTAssertTrue(SoundImport.isContainedIn(directory: dir, file: file))
     XCTAssertFalse(SoundImport.isContainedIn(directory: dir, file: outside))
   }
+
+  func testOutputClassifierTreatsJackHeadphonesAsHeadphones() {
+    XCTAssertEqual(
+      AudioOutputClassifier.kind(transport: AudioOutputClassifier.builtInTransport, dataSource: AudioOutputClassifier.headphonesDataSource),
+      .headphones
+    )
+  }
+
+  func testOutputClassifierTreatsBuiltInSpeakersAsOther() {
+    XCTAssertEqual(
+      AudioOutputClassifier.kind(transport: AudioOutputClassifier.builtInTransport, dataSource: AudioOutputClassifier.internalSpeakersDataSource),
+      .other
+    )
+  }
+
+  func testOutputClassifierTreatsBluetoothAsHeadphones() {
+    XCTAssertEqual(
+      AudioOutputClassifier.kind(transport: AudioOutputClassifier.bluetoothTransport, dataSource: nil),
+      .headphones
+    )
+    XCTAssertEqual(
+      AudioOutputClassifier.kind(transport: AudioOutputClassifier.bluetoothLETransport, dataSource: nil),
+      .headphones
+    )
+  }
+
+  func testHeadphoneAutoPausePausesWhenHeadphonesGoAwayWhilePlaying() {
+    var controller = HeadphoneAutoPauseController()
+    XCTAssertEqual(controller.update(kind: .headphones, isPlaying: true), .none)
+    XCTAssertEqual(controller.update(kind: .other, isPlaying: true), .pause)
+    XCTAssertTrue(controller.pausedDueToDisconnect)
+  }
+
+  func testHeadphoneAutoPauseResumesOnlyAfterAutoPause() {
+    var controller = HeadphoneAutoPauseController()
+    _ = controller.update(kind: .headphones, isPlaying: true)
+    _ = controller.update(kind: .other, isPlaying: true)
+    XCTAssertEqual(controller.update(kind: .headphones, isPlaying: false), .resume)
+    XCTAssertFalse(controller.pausedDueToDisconnect)
+  }
+
+  func testHeadphoneAutoPauseDoesNotPauseWhenLeavingNonHeadphones() {
+    var controller = HeadphoneAutoPauseController()
+    XCTAssertEqual(controller.update(kind: .other, isPlaying: true), .none)
+    XCTAssertEqual(controller.update(kind: .headphones, isPlaying: true), .none)
+    XCTAssertFalse(controller.pausedDueToDisconnect)
+  }
+
+  func testHeadphoneAutoPauseIgnoresDisconnectWhenAlreadyPausedByUser() {
+    var controller = HeadphoneAutoPauseController()
+    _ = controller.update(kind: .headphones, isPlaying: false)
+    XCTAssertEqual(controller.update(kind: .other, isPlaying: false), .none)
+    XCTAssertFalse(controller.pausedDueToDisconnect)
+    XCTAssertEqual(controller.update(kind: .headphones, isPlaying: false), .none)
+  }
+
+  func testHeadphoneAutoPauseClearsFlagOnManualPause() {
+    var controller = HeadphoneAutoPauseController()
+    _ = controller.update(kind: .headphones, isPlaying: true)
+    _ = controller.update(kind: .other, isPlaying: true)
+    controller.noteManualPause()
+    XCTAssertFalse(controller.pausedDueToDisconnect)
+    XCTAssertEqual(controller.update(kind: .headphones, isPlaying: false), .none)
+  }
+
+  func testHeadphoneAutoPauseClearsFlagOnManualPlay() {
+    var controller = HeadphoneAutoPauseController()
+    _ = controller.update(kind: .headphones, isPlaying: true)
+    _ = controller.update(kind: .other, isPlaying: true)
+    controller.noteManualPlay()
+    XCTAssertFalse(controller.pausedDueToDisconnect)
+    XCTAssertEqual(controller.update(kind: .headphones, isPlaying: true), .none)
+  }
+
+  func testHeadphoneAutoPauseIgnoresDuplicateKindUpdates() {
+    var controller = HeadphoneAutoPauseController()
+    XCTAssertEqual(controller.update(kind: .headphones, isPlaying: true), .none)
+    XCTAssertEqual(controller.update(kind: .headphones, isPlaying: true), .none)
+  }
 }
