@@ -93,6 +93,15 @@ struct MenuBarView: View {
       HStack {
         Button("Quit") { NSApplication.shared.terminate(nil) }
         Spacer()
+        Button(model.globalHotkeyMenuTitle) {
+          if model.isCapturingHotkey {
+            model.cancelGlobalHotkeyCapture()
+          } else {
+            model.beginGlobalHotkeyCapture()
+          }
+        }
+        .help("Toggle play/pause from anywhere while Focus Sounds is running. Click, then press a shortcut with ⌃, ⌥, ⇧, or ⌘.")
+        Spacer()
         if model.canDeleteSelectedSound {
           Button("Delete sound", role: .destructive) {
             model.deleteSelectedSound()

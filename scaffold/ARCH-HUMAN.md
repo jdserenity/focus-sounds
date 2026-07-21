@@ -13,3 +13,11 @@ It treats wired jack headphones and Bluetooth/Bluetooth LE outputs as headphones
 ## AirPods / media controls
 
 While Focus Sounds is playing (or paused with a sound still loaded), macOS treats it as the Now Playing app. That means the AirPods pause/play action and keyboard media keys control my focus audio instead of opening Apple Music.
+
+## Global hotkey
+
+I can set a keyboard shortcut (default Control+Option+Space) that toggles play/pause without opening the menu. The shortcut only works while Focus Sounds is running in the menu bar. I change it from the bottom row of the panel, between Quit and Delete sound.
+
+## Smooth loops
+
+When a track loops, the app crossfades the end into a fresh copy at the start (~2.5 seconds) so I do not hear a hard jump or click.

@@ -16,3 +16,10 @@ Broader stack/product layout: `scaffold/ARCHITECTURE.md`.
 - While a sound session is loaded, app publishes to `MPNowPlayingInfoCenter` (`playbackState` + title/artist) and handles `MPRemoteCommandCenter` play/pause/toggle so AirPods stem / media keys control Focus Sounds instead of launching Music.
 - Presentation rules: `NowPlayingPresentationBuilder` — active while `hasLoadedItem` (playing or paused); inactive after stop/select clears the player. `NowPlayingController` applies MediaPlayer updates; macOS needs explicit `playbackState`.
 - Unit tests for presentation builder in `FocusSoundsCoreTests`.
+
+## Global play/pause hotkey
+- Configurable system-wide hotkey (default ⌃⌥Space) toggles play/pause for the selected sound while the menu bar app is running. Stored in `UserDefaults` as JSON (`GlobalHotkey.userDefaultsKey`). Registered via Carbon `RegisterEventHotKey` (`GlobalHotkeyController`).
+- Menu bar footer: **Play hotkey** control between Quit and Delete sound; click then press a shortcut that includes ⌃, ⌥, ⇧, or ⌘ (Esc cancels capture). `HotkeyCaptureSession` uses a local `NSEvent` monitor while capturing.
+
+## Loop crossfade
+- `FocusPlayer` uses dual `AVPlayer` instances with equal-power crossfade (~2.5s, clamped to half track length) near each loop boundary (`LoopCrossfade` in FocusSoundsCore). Replaces hard seek-to-zero loop.

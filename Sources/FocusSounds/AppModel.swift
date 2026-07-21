@@ -18,6 +18,8 @@ final class AppModel {
   private let monitor = SystemAudioMonitor()
   private let outputRouteMonitor = OutputRouteMonitor()
   private let nowPlaying = NowPlayingController()
+  private let globalHotkeyController = GlobalHotkeyController()
+  private let hotkeyCapture = HotkeyCaptureSession()
   private var ducking = DuckingController()
   private var volumeFader = VolumeFader()
   private var headphoneAutoPause = HeadphoneAutoPauseController()
@@ -34,6 +36,13 @@ final class AppModel {
   var permissionState: PermissionState = .unknown
   var externalLevel: Float = 0
   var focusVolume: Float
+  var globalHotkey: GlobalHotkey
+  var isCapturingHotkey = false
+
+  var globalHotkeyMenuTitle: String {
+    if isCapturingHotkey { return "Press" }
+    return "\(globalHotkey.displayLabel)"
+  }
 
   var selectedSound: FocusSound? {
     guard let selectedSoundID else { return sounds.first }
@@ -47,9 +56,11 @@ final class AppModel {
   init() {
     let stored = UserDefaults.standard.float(forKey: Self.focusVolumeKey)
     focusVolume = stored > 0 ? stored : 0.75
+    globalHotkey = Self.loadGlobalHotkey()
     selectedSoundID = sounds.first?.id
     startOutputRouteMonitoring()
     startNowPlaying()
+    startGlobalHotkey()
   }
 
   func togglePlayPause() {
@@ -182,6 +193,53 @@ final class AppModel {
     ducking = DuckingController()
     volumeFader = VolumeFader(current: focusVolume)
     publishNowPlaying()
+  }
+
+  func beginGlobalHotkeyCapture() {
+    isCapturingHotkey = true
+    hotkeyCapture.start(
+      onCapture: { [weak self] hotkey in
+        self?.setGlobalHotkey(hotkey)
+      },
+      onCancel: { [weak self] in
+        self?.hotkeyCapture.stop()
+        self?.isCapturingHotkey = false
+      }
+    )
+  }
+
+  func cancelGlobalHotkeyCapture() {
+    hotkeyCapture.stop()
+    isCapturingHotkey = false
+  }
+
+  func setGlobalHotkey(_ hotkey: GlobalHotkey) {
+    hotkeyCapture.stop()
+    isCapturingHotkey = false
+    globalHotkey = hotkey
+    saveGlobalHotkey(hotkey)
+    globalHotkeyController.apply(hotkey)
+  }
+
+  private static func loadGlobalHotkey() -> GlobalHotkey {
+    guard let data = UserDefaults.standard.data(forKey: GlobalHotkey.userDefaultsKey),
+          let hotkey = try? JSONDecoder().decode(GlobalHotkey.self, from: data),
+          hotkey.isValid else {
+      return .default
+    }
+    return hotkey
+  }
+
+  private func saveGlobalHotkey(_ hotkey: GlobalHotkey) {
+    guard let data = try? JSONEncoder().encode(hotkey) else { return }
+    UserDefaults.standard.set(data, forKey: GlobalHotkey.userDefaultsKey)
+  }
+
+  private func startGlobalHotkey() {
+    globalHotkeyController.onTrigger = { [weak self] in
+      self?.togglePlayPause()
+    }
+    globalHotkeyController.apply(globalHotkey)
   }
 
   private func startNowPlaying() {
